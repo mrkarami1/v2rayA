@@ -638,42 +638,84 @@ ref="v2ray_key" v-model="v2ray.key" :placeholder="$t('configureServer.password')
         </b-tab-item>
 
         <b-tab-item label="Hysteria2">
+          <!-- Basic Fields -->
           <b-field label="Name" label-position="on-border">
             <b-input ref="hysteria2_name" v-model="hysteria2.name" :placeholder="$t('configureServer.servername')"
               expanded />
           </b-field>
+          
           <b-field label="Host" label-position="on-border">
             <b-input ref="hysteria2_server" v-model="hysteria2.server" required placeholder="IP / HOST" expanded />
           </b-field>
+          
           <b-field label="Port" label-position="on-border">
             <b-input ref="hysteria2_port" v-model="hysteria2.port" required :placeholder="$t('configureServer.port')"
               type="number" expanded />
           </b-field>
+          
           <b-field label="Password" label-position="on-border">
-            <b-input ref="hysteria2_password" v-model="hysteria2.password" required
+            <b-input ref="hysteria2_password" v-model="hysteria2.password" required type="password"
               :placeholder="$t('configureServer.password')" expanded />
           </b-field>
+          
+          <b-field label="SNI" label-position="on-border">
+            <b-input ref="hysteria2_sni" v-model="hysteria2.sni" placeholder="SNI (TLS Server Name)" expanded />
+          </b-field>
+          
           <b-field label-position="on-border">
-            <template slot="label"> AllowInsecure </template>
+            <template slot="label"> Skip TLS Verify </template>
             <b-select ref="hysteria2_allow_insecure" v-model="hysteria2.allowInsecure" expanded required>
               <option :value="false">{{ $t("operations.no") }}</option>
-              <option :value="true">
-                {{ $t("operations.yes") }}
-              </option>
+              <option :value="true">{{ $t("operations.yes") }}</option>
             </b-select>
           </b-field>
-          <b-field label="SNI" label-position="on-border">
-            <b-input v-model="hysteria2.sni" placeholder="SNI" expanded />
+          
+          <!-- Bandwidth (Important for Hysteria2) -->
+          <b-field grouped>
+            <b-field label="Upload (Mbps)" label-position="on-border" expanded>
+              <b-input ref="hysteria2_up_mbps" v-model.number="hysteria2.upMbps" type="number" 
+                placeholder="100" min="0" expanded />
+            </b-field>
+            <b-field label="Download (Mbps)" label-position="on-border" expanded>
+              <b-input ref="hysteria2_down_mbps" v-model.number="hysteria2.downMbps" type="number" 
+                placeholder="200" min="0" expanded />
+            </b-field>
           </b-field>
-          <b-field label="Obfs" label-position="on-border">
-            <b-select v-model="hysteria2.obfs" expanded required>
-              <option value="none">none</option>
-              <option value="salamander">salamander</option>
-            </b-select>
+          
+          <!-- Advanced Options Toggle -->
+          <b-field>
+            <b-button 
+              type="is-light" 
+              size="is-small" 
+              expanded
+              @click="hysteria2ShowAdvanced = !hysteria2ShowAdvanced"
+            >
+              <b-icon :icon="hysteria2ShowAdvanced ? 'menu-up' : 'menu-down'"></b-icon>
+              <span>{{ hysteria2ShowAdvanced ? 'Hide' : 'Show' }} Advanced Options</span>
+            </b-button>
           </b-field>
-          <b-field v-if="hysteria2.obfs !== 'none'" label="Obfs Password" label-position="on-border">
-            <b-input v-model="hysteria2.obfsPassword" placeholder="Obfs Password" expanded />
-          </b-field>
+          
+          <!-- Advanced Fields (Collapsible) -->
+          <div v-show="hysteria2ShowAdvanced">
+            <b-field label="Obfuscation" label-position="on-border">
+              <b-select v-model="hysteria2.obfs" expanded>
+                <option value="none">Disabled</option>
+                <option value="salamander">Salamander</option>
+              </b-select>
+            </b-field>
+            
+            <b-field v-if="hysteria2.obfs !== 'none'" label="Obfs Password" label-position="on-border">
+              <b-input v-model="hysteria2.obfsPassword" type="password" placeholder="Obfuscation Password" expanded />
+            </b-field>
+            
+            <b-field label="Network" label-position="on-border">
+              <b-select v-model="hysteria2.network" expanded>
+                <option value="">Auto (TCP + UDP)</option>
+                <option value="tcp">TCP Only</option>
+                <option value="udp">UDP Only</option>
+              </b-select>
+            </b-field>
+          </div>
         </b-tab-item>
 
         <b-tab-item label="HTTP">
@@ -885,8 +927,12 @@ export default {
       obfs: "none",
       obfsPassword: "",
       allowInsecure: false,
+      upMbps: 100,
+      downMbps: 200,
+      network: "",
       protocol: "hysteria2",
     },
+    hysteria2ShowAdvanced: false,
     http: {
       username: "",
       password: "",
@@ -1179,6 +1225,9 @@ export default {
           allowInsecure: u.params.insecure === "true" || u.params.insecure === "1",
           obfs: u.params.obfs || "none",
           obfsPassword: u.params["obfs-password"] || "",
+          upMbps: parseInt(u.params.up) || 100,
+          downMbps: parseInt(u.params.down) || 200,
+          network: u.params.network || "",
           protocol: "hysteria2",
         };
       } else if (
@@ -1438,6 +1487,15 @@ export default {
           if (srcObj.sni !== "") {
             query.sni = srcObj.sni;
           }
+          if (srcObj.upMbps > 0) {
+            query.up = srcObj.upMbps;
+          }
+          if (srcObj.downMbps > 0) {
+            query.down = srcObj.downMbps;
+          }
+          if (srcObj.network !== "") {
+            query.network = srcObj.network;
+          }
           if (srcObj.obfs !== "none") {
             query.obfs = srcObj.obfs;
             query["obfs-password"] = srcObj.obfsPassword;
@@ -1641,7 +1699,7 @@ export default {
         coded = url;
       } else if (this.tabChoice === 6) {
         // hysteria2://password@server:port?insecure=1&obfs=xxx#name
-        const { password, server, port, allowInsecure, obfs, obfsPassword, sni, name } = this.hysteria2;
+        const { password, server, port, allowInsecure, obfs, obfsPassword, sni, name, upMbps, downMbps, network } = this.hysteria2;
         let params = [];
         if (allowInsecure) params.push("insecure=1");
         if (obfs) params.push(`obfs=${encodeURIComponent(obfs)}`);
