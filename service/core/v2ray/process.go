@@ -255,11 +255,12 @@ func StartCoreProcess(ctx context.Context) (*os.Process, error) {
 	log.Info("Asset directory for %s: %v", variant, assetDir)
 
 	// Prepare environment variables, filtering out duplicates
-	env := make([]string, 0, len(os.Environ())+4)
+	env := make([]string, 0, len(os.Environ())+5)
 	for _, e := range os.Environ() {
-		// Skip existing V2RAY_LOCATION_ASSET, XRAY_LOCATION_ASSET, V2RAY_CONF_GEOLOADER
+		// Skip existing asset location environment variables
 		if strings.HasPrefix(e, "V2RAY_LOCATION_ASSET=") ||
 			strings.HasPrefix(e, "XRAY_LOCATION_ASSET=") ||
+			strings.HasPrefix(e, "HYSTERIA2_LOCATION_ASSET=") ||
 			strings.HasPrefix(e, "V2RAY_CONF_GEOLOADER=") {
 			continue
 		}
@@ -272,11 +273,14 @@ func StartCoreProcess(ctx context.Context) (*os.Process, error) {
 		env = append(env, "V2RAY_LOCATION_ASSET="+assetDir)
 	case where.Xray:
 		env = append(env, "XRAY_LOCATION_ASSET="+assetDir)
+	case where.Hysteria2:
+		env = append(env, "HYSTERIA2_LOCATION_ASSET="+assetDir)
 	default:
-		// If unknown, set both for compatibility
+		// If unknown, set all for compatibility
 		env = append(env,
 			"V2RAY_LOCATION_ASSET="+assetDir,
 			"XRAY_LOCATION_ASSET="+assetDir,
+			"HYSTERIA2_LOCATION_ASSET="+assetDir,
 		)
 	}
 
